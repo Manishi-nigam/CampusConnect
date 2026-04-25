@@ -1,0 +1,38 @@
+<h3 class="mb-4">Events</h3>
+
+@if (loading) {
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+}
+
+@if (!loading && events.length === 0) {
+  <div class="alert alert-warning">
+    No events found.
+  </div>
+}
+
+@if (!loading && events.length > 0) {
+  <div class="row g-3">
+    @for (e of events; track e.id) {
+      <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title">{{ e.title }}</h5>
+            <p class="card-text">{{ e.description }}</p>
+            <p class="text-muted mb-0">
+              {{ e.location }} • {{ e.date }}
+            </p>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+<a
+  class="btn btn-outline-secondary mt-4"
+  routerLink="/students"
+>
+  ← Back to Students
+</a>

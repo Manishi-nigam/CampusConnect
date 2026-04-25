@@ -1,0 +1,23 @@
+<h2>Students</h2>
+
+<form (ngSubmit)="addStudent()" class="mb-3">
+  <input class="form-control mb-2" placeholder="Name" [(ngModel)]="newStudent.name" name="name" />
+  <input class="form-control mb-2" placeholder="Email" [(ngModel)]="newStudent.email" name="email" />
+  <input class="form-control mb-2" placeholder="Roll Number" [(ngModel)]="newStudent.rollNumber" name="roll" />
+  <input class="form-control mb-2" placeholder="Department" [(ngModel)]="newStudent.department" name="dept" />
+  <input class="form-control mb-2" placeholder="Year" type="number" [(ngModel)]="newStudent.year" name="year" />
+
+  <button class="btn btn-primary">Add Student</button>
+</form>
+
+<hr />
+
+<ul class="list-group">
+  <li class="list-group-item" *ngFor="let s of students">
+    {{ s.name }} ({{ s.rollNumber }})
+    <a class="btn btn-sm btn-outline-secondary float-end"
+       [routerLink]="['/students', s.id, 'events']">
+       View Events
+    </a>
+  </li>
+</ul>
