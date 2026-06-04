@@ -1,6 +1,7 @@
 package CampusConnect.Application.connect.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -34,7 +35,8 @@ public class Event {
     @JsonBackReference
     private User createdBy;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "event_participants", joinColumns = @JoinColumn(name = "event_id"), inverseJoinColumns = @JoinColumn(name = "student_id"))
+    @JsonIgnore
     private java.util.List<Student> participants = new java.util.ArrayList<>();
 }
