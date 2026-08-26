@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface JoinRequestRepository extends JpaRepository<JoinRequest, Long> {
     Optional<JoinRequest> findByEventIdAndUserId(Long eventId, Long userId);
     List<JoinRequest> findByEventId(Long eventId);
+    List<JoinRequest> findByEventIdIn(List<Long> eventIds);
 }

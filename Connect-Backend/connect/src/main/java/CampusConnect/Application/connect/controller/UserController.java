@@ -3,12 +3,17 @@ package CampusConnect.Application.connect.controller;
 import CampusConnect.Application.connect.entity.User;
 import CampusConnect.Application.connect.repository.UserRepository;
 import CampusConnect.Application.connect.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/users")
+@Tag(name = "Users", description = "User querying and management endpoints")
 public class UserController {
 
     private final UserRepository userRepository;
@@ -17,17 +22,19 @@ public class UserController {
     public UserController(UserRepository userRepository,
                           UserService userService) {
         this.userRepository = userRepository;
-        this.userService=userService;
+        this.userService = userService;
     }
 
-
     @PostMapping
-    public User createUser(@RequestBody User user) {
-        return userService.register(user);
+    @Operation(summary = "Register/Create a user")
+    public ResponseEntity<User> createUser(@RequestBody User user) {
+        User created = userService.register(user);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    @Operation(summary = "Get all registered users")
+    public ResponseEntity<List<User>> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
     }
 }

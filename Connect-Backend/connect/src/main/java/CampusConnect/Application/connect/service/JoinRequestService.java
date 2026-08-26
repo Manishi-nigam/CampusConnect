@@ -4,6 +4,8 @@ import CampusConnect.Application.connect.entity.Event;
 import CampusConnect.Application.connect.entity.JoinRequest;
 import CampusConnect.Application.connect.entity.Student;
 import CampusConnect.Application.connect.entity.User;
+import CampusConnect.Application.connect.exception.ResourceNotFoundException;
+import CampusConnect.Application.connect.exception.UnauthorizedException;
 import CampusConnect.Application.connect.repository.EventRepository;
 import CampusConnect.Application.connect.repository.JoinRequestRepository;
 import CampusConnect.Application.connect.repository.StudentRepository;
@@ -24,10 +26,10 @@ public class JoinRequestService {
     private final NotificationService notificationService;
 
     public JoinRequestService(JoinRequestRepository joinRequestRepository,
-            StudentRepository studentRepository,
-            UserRepository userRepository,
-            EventRepository eventRepository,
-            NotificationService notificationService) {
+                              StudentRepository studentRepository,
+                              UserRepository userRepository,
+                              EventRepository eventRepository,
+                              NotificationService notificationService) {
         this.joinRequestRepository = joinRequestRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
@@ -37,19 +39,17 @@ public class JoinRequestService {
 
     // ✅ STUDENT REQUEST TO JOIN
     public JoinRequest requestToJoin(Long eventId, Long userId) {
-
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
 
-        if (!"STUDENT".equals(user.getRole())) {
-            throw new RuntimeException("Only STUDENT can request to join");
+        if (!"STUDENT".equalsIgnoreCase(user.getRole()) && !"ADMIN".equalsIgnoreCase(user.getRole())) {
+            throw new UnauthorizedException("Only STUDENT can request to join events");
         }
 
         Optional<JoinRequest> existingRequest = joinRequestRepository.findByEventIdAndUserId(eventId, userId);
 
-        if (existingRequest.isPresent() &&
-                "PENDING".equals(existingRequest.get().getStatus())) {
-            throw new RuntimeException("Request already pending");
+        if (existingRequest.isPresent() && "PENDING".equalsIgnoreCase(existingRequest.get().getStatus())) {
+            throw new IllegalArgumentException("Request already pending");
         }
 
         JoinRequest request = new JoinRequest();
@@ -61,73 +61,72 @@ public class JoinRequestService {
         return joinRequestRepository.save(request);
     }
 
-    // ✅ CLUB APPROVES REQUEST
+    // ✅ CLUB HEAD APPROVES REQUEST
     public JoinRequest approveRequest(Long requestId, Long clubUserId) {
-
         User clubUser = userRepository.findById(clubUserId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + clubUserId));
 
-        if (!"CLUB".equals(clubUser.getRole())) {
-            throw new RuntimeException("Only CLUB can approve requests");
+        if (!"CLUB_HEAD".equalsIgnoreCase(clubUser.getRole()) &&
+            !"ADMIN".equalsIgnoreCase(clubUser.getRole())) {
+            throw new UnauthorizedException("Only CLUB_HEAD or ADMIN can approve requests");
         }
 
         JoinRequest request = joinRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Request not found with id " + requestId));
 
         Event event = eventRepository.findById(request.getEventId())
-                .orElseThrow(() -> new RuntimeException("Event not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found with id " + request.getEventId()));
 
-        // 🔥 FIXED: check event ownership using USER
-        if (!event.getCreatedBy().getId().equals(clubUserId)) {
-            throw new RuntimeException("Only the club that created the event can approve requests");
+        if (!"ADMIN".equalsIgnoreCase(clubUser.getRole()) && !event.getCreatedBy().getId().equals(clubUserId)) {
+            throw new UnauthorizedException("Only the club that created the event can approve requests");
         }
 
         request.setStatus("APPROVED");
         JoinRequest savedRequest = joinRequestRepository.save(request);
 
         // Add participant (student)
-        Student participant = studentRepository.findByUserId(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("Participant profile not found"));
-
-        if (!event.getParticipants().contains(participant)) {
-            event.getParticipants().add(participant);
-            eventRepository.save(event);
+        Optional<Student> participantOpt = studentRepository.findByUserId(request.getUserId());
+        if (participantOpt.isPresent()) {
+            Student participant = participantOpt.get();
+            if (!event.getParticipants().contains(participant)) {
+                event.getParticipants().add(participant);
+                eventRepository.save(event);
+            }
         }
 
         // Send notification
-        notificationService.createNotification(request.getUserId(), 
-            "Your request for event " + event.getTitle() + " is APPROVED");
+        notificationService.createNotification(request.getUserId(),
+                "Your request for event \"" + event.getTitle() + "\" is APPROVED");
 
         return savedRequest;
     }
 
-    // ✅ CLUB REJECTS REQUEST
+    // ✅ CLUB HEAD REJECTS REQUEST
     public JoinRequest rejectRequest(Long requestId, Long clubUserId) {
-
         User clubUser = userRepository.findById(clubUserId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + clubUserId));
 
-        if (!"CLUB".equals(clubUser.getRole())) {
-            throw new RuntimeException("Only CLUB can reject requests");
+        if (!"CLUB_HEAD".equalsIgnoreCase(clubUser.getRole()) &&
+            !"ADMIN".equalsIgnoreCase(clubUser.getRole())) {
+            throw new UnauthorizedException("Only CLUB_HEAD or ADMIN can reject requests");
         }
 
         JoinRequest request = joinRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Request not found with id " + requestId));
 
         Event event = eventRepository.findById(request.getEventId())
-                .orElseThrow(() -> new RuntimeException("Event not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found with id " + request.getEventId()));
 
-        // 🔥 FIXED: check event ownership using USER
-        if (!event.getCreatedBy().getId().equals(clubUserId)) {
-            throw new RuntimeException("Only the club that created the event can reject requests");
+        if (!"ADMIN".equalsIgnoreCase(clubUser.getRole()) && !event.getCreatedBy().getId().equals(clubUserId)) {
+            throw new UnauthorizedException("Only the club that created the event can reject requests");
         }
 
         request.setStatus("REJECTED");
         JoinRequest savedRequest = joinRequestRepository.save(request);
 
         // Send notification
-        notificationService.createNotification(request.getUserId(), 
-            "Your request for event " + event.getTitle() + " is REJECTED");
+        notificationService.createNotification(request.getUserId(),
+                "Your request for event \"" + event.getTitle() + "\" is REJECTED");
 
         return savedRequest;
     }
@@ -135,5 +134,13 @@ public class JoinRequestService {
     // ✅ VIEW ALL REQUESTS FOR EVENT
     public List<JoinRequest> getRequestsForEvent(Long eventId) {
         return joinRequestRepository.findByEventId(eventId);
+    }
+
+    // ✅ BATCH AGGREGATE: VIEW REQUESTS FOR MULTIPLE EVENTS
+    public List<JoinRequest> getRequestsForEvents(List<Long> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return List.of();
+        }
+        return joinRequestRepository.findByEventIdIn(eventIds);
     }
 }

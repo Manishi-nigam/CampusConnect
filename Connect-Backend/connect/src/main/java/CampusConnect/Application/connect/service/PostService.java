@@ -6,6 +6,9 @@ import CampusConnect.Application.connect.entity.Post;
 import CampusConnect.Application.connect.repository.CommentRepository;
 import CampusConnect.Application.connect.repository.LikeRepository;
 import CampusConnect.Application.connect.repository.PostRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -67,20 +70,25 @@ public class PostService {
         return savedComment;
     }
 
-    public List<Post> getFeed() {
-        List<Post> posts = postRepository.findAll();
-        
-        for (Post post : posts) {
+    public Page<Post> getFeed(int page, int size) {
+        // Enforce safe boundary limits: 1 <= size <= 50, page >= 0
+        int clampedPage = Math.max(0, page);
+        int clampedSize = Math.min(Math.max(1, size), 50);
+
+        LocalDateTime recentCutoff = LocalDateTime.now().minusHours(24);
+        Pageable pageable = PageRequest.of(clampedPage, clampedSize);
+
+        Page<Post> postPage = postRepository.findFeedWithScoring(recentCutoff, pageable);
+
+        // Populate transient score field for client presentation
+        postPage.getContent().forEach(post -> {
             double score = (post.getLikeCount() * 2) + (post.getCommentCount() * 3);
-            
-            if (post.getCreatedAt().isAfter(LocalDateTime.now().minusHours(24))) {
+            if (post.getCreatedAt() != null && post.getCreatedAt().isAfter(recentCutoff)) {
                 score += 10;
             }
-            
             post.setScore(score);
-        }
-        
-        posts.sort(java.util.Comparator.comparingDouble(Post::getScore).reversed());
-        return posts;
+        });
+
+        return postPage;
     }
 }
